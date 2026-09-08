@@ -1,0 +1,198 @@
+@page "/server-control"
+@using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.ServerProcess
+@implements IDisposable
+@inject IAppConfigService AppConfigService
+@inject IServerProcessManager ServerProcessManager
+@rendermode InteractiveServer
+
+<PageTitle>Server Control</PageTitle>
+
+<h1>Server Control</h1>
+
+@if (_installPath is null)
+{
+    <p>No server install folder is configured yet. <a href="/setup">Go to Setup</a> first.</p>
+}
+else if (!_exeExists)
+{
+    <p class="setup-status setup-status-error">No PalServer.exe found at <code>@_exePath</code>.</p>
+}
+else
+{
+    <div class="control-status @(_status.IsRunning ? "control-status-running" : "control-status-stopped")">
+        <span class="control-status-dot"></span>
+        <div>
+            <div class="control-status-label">@(_status.IsRunning ? "Running" : "Stopped")</div>
+            @if (_status.IsRunning)
+            {
+                <div class="control-status-detail">PID @_status.ProcessId · up @FormatUptime()</div>
+            }
+        </div>
+    </div>
+
+    @if (_errorMessage is not null)
+    {
+        <p class="setup-status setup-status-error">@_errorMessage</p>
+    }
+
+    <div class="control-actions">
+        <button type="button" class="btn btn-primary" disabled="@(_status.IsRunning || _busy)" @onclick="StartServer">Start</button>
+
+        @if (!_confirmingStop)
+        {
+            <button type="button" class="btn btn-secondary" disabled="@(!_status.IsRunning || _busy)" @onclick="() => _confirmingStop = true">Stop</button>
+        }
+        else
+        {
+            <span class="control-confirm-stop">
+                Stop the server now?
+                <button type="button" class="btn btn-danger" disabled="@_busy" @onclick="StopServer">Yes, stop it</button>
+                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="() => _confirmingStop = false">Cancel</button>
+            </span>
+        }
+
+        @if (_busy)
+        {
+            <span class="control-busy-message">@_busyMessage</span>
+        }
+    </div>
+    <p class="setting-field-description">Stop first asks the server to shut down cleanly (so it can save); if it hasn't exited after @_gracefulTimeout.TotalSeconds seconds, it's force-closed.</p>
+
+    <h2>Launch Options</h2>
+    <div class="setup-field">
+        <label for="launch-args">Extra command-line arguments</label>
+        <div class="setup-field-row">
+            <input id="launch-args" type="text" @bind="_launchArguments" @bind:event="oninput" placeholder="e.g. -useperfthreads -NoAsyncLoadingThread" />
+            <button type="button" class="btn btn-secondary" @onclick="SaveLaunchArguments">Save</button>
+        </div>
+        @if (_launchArgsSavedMessage is not null)
+        {
+            <span class="setup-saved-message">@_launchArgsSavedMessage</span>
+        }
+    </div>
+}
+
+@code {
+    private string? _installPath;
+    private string _exePath = string.Empty;
+    private bool _exeExists;
+    private ServerProcessStatus _status = new(false, null, null);
+    private string? _errorMessage;
+    private bool _busy;
+    private string _busyMessage = string.Empty;
+    private bool _confirmingStop;
+    private string _launchArguments = string.Empty;
+    private string? _launchArgsSavedMessage;
+    private readonly TimeSpan _gracefulTimeout = TimeSpan.FromSeconds(30);
+    private Timer? _pollTimer;
+
+    protected override void OnInitialized()
+    {
+        var config = AppConfigService.Current;
+        _installPath = config.ServerInstallPath;
+        _launchArguments = config.LaunchArguments ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_installPath))
+        {
+            _installPath = null;
+            return;
+        }
+
+        _exePath = ServerProcessManager.GetExecutablePath(_installPath);
+        _exeExists = File.Exists(_exePath);
+
+        if (_exeExists)
+        {
+            RefreshStatus();
+            _pollTimer = new Timer(_ => InvokeAsync(() => { RefreshStatus(); StateHasChanged(); }), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+        }
+    }
+
+    private void RefreshStatus()
+    {
+        if (_installPath is not null)
+        {
+            _status = ServerProcessManager.GetStatus(_installPath);
+        }
+    }
+
+    private string FormatUptime()
+    {
+        if (_status.StartTimeUtc is not DateTime start)
+        {
+            return string.Empty;
+        }
+
+        var span = DateTime.UtcNow - start;
+        return span.TotalHours >= 1
+            ? $"{(int)span.TotalHours}h {span.Minutes}m"
+            : $"{span.Minutes}m {span.Seconds}s";
+    }
+
+    private async Task StartServer()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _busyMessage = "Starting…";
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            ServerProcessManager.Start(_installPath, _launchArguments);
+            await Task.Delay(1000);
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to start: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task StopServer()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        _confirmingStop = false;
+        _busy = true;
+        _busyMessage = "Stopping…";
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await ServerProcessManager.StopAsync(_installPath, _gracefulTimeout);
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to stop: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SaveLaunchArguments()
+    {
+        var config = AppConfigService.Current;
+        config.LaunchArguments = _launchArguments;
+        await AppConfigService.SaveAsync(config);
+        _launchArgsSavedMessage = "Saved.";
+    }
+
+    public void Dispose() => _pollTimer?.Dispose();
+}

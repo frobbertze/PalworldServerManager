@@ -1,5 +1,6 @@
 using PalworldServerManager.Core.Configuration;
 using PalworldServerManager.Core.FileSystem;
+using PalworldServerManager.Core.ServerProcess;
 using PalworldServerManager.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddSingleton<IAppConfigService, AppConfigService>();
 builder.Services.AddSingleton<IFileSystemBrowser, FileSystemBrowser>();
+builder.Services.AddSingleton<IServerProcessManager, ServerProcessManager>();
 
 var app = builder.Build();
 

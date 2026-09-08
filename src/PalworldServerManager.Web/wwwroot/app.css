@@ -90,6 +90,74 @@ body {
     margin: 2rem;
 }
 
+.control-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    max-width: 20rem;
+    margin-bottom: 1rem;
+}
+
+.control-status-running {
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+}
+
+.control-status-stopped {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.control-status-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.control-status-running .control-status-dot {
+    background: #38a169;
+}
+
+.control-status-stopped .control-status-dot {
+    background: #a0aec0;
+}
+
+.control-status-label {
+    font-weight: 600;
+}
+
+.control-status-detail {
+    font-size: 0.85rem;
+    color: #4a5568;
+}
+
+.control-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.btn-danger {
+    background: #c53030;
+    color: white;
+}
+
+.control-confirm-stop {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.control-busy-message {
+    color: #4a5568;
+    font-size: 0.9rem;
+}
+
 .btn {
     padding: 0.5rem 1rem;
     border-radius: 4px;
