@@ -45,9 +45,49 @@ html {
 
 body {
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    margin: 2rem;
+    margin: 0;
     color: #1b1b1b;
     background: #ffffff;
+}
+
+.app-nav {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 0.75rem 2rem;
+    background: #1a365d;
+    color: white;
+}
+
+.app-nav-title {
+    font-weight: 700;
+}
+
+.app-nav nav {
+    display: flex;
+    gap: 1.25rem;
+}
+
+.app-nav nav a {
+    color: #cbd5e0;
+    text-decoration: none;
+    font-size: 0.95rem;
+    padding: 0.25rem 0;
+    border-bottom: 2px solid transparent;
+}
+
+.app-nav nav a:hover {
+    color: white;
+}
+
+.app-nav nav a.active {
+    color: white;
+    border-bottom-color: #4299e1;
+    font-weight: 600;
+}
+
+.app-main {
+    margin: 2rem;
 }
 
 .btn {
