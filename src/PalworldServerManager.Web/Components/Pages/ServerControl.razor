@@ -3,6 +3,7 @@
 @using PalworldServerManager.Core.Rcon
 @using PalworldServerManager.Core.Settings
 @using PalworldServerManager.Core.ServerProcess
+@using PalworldServerManager.Core.WorldData
 @implements IDisposable
 @inject IAppConfigService AppConfigService
 @inject IServerProcessManager ServerProcessManager
@@ -77,6 +78,44 @@ else
             <span class="setup-saved-message">@_launchArgsSavedMessage</span>
         }
     </div>
+
+    <h2>Danger Zone</h2>
+    <div class="danger-zone">
+        @if (!_hasSaveData)
+        {
+            <p class="setting-field-description">No save data yet — nothing to wipe.</p>
+        }
+        else
+        {
+            <p class="setting-field-description">
+                Deletes the current world so the server generates a fresh one on next start. A zip
+                backup of the current save data is made first, kept under <code>Pal\Saved\SaveGames_Backups</code>.
+                Server settings (PalWorldSettings.ini) are not touched.
+            </p>
+
+            @if (_status.IsRunning)
+            {
+                <p class="setup-status setup-status-warn">Stop the server first before wiping.</p>
+            }
+            else if (!_confirmingWipe)
+            {
+                <button type="button" class="btn btn-danger" disabled="@_busy" @onclick="() => _confirmingWipe = true">Wipe Server…</button>
+            }
+            else
+            {
+                <span class="control-confirm-stop">
+                    This permanently deletes the current world (after backing it up). Continue?
+                    <button type="button" class="btn btn-danger" disabled="@_busy" @onclick="WipeServer">Yes, wipe it</button>
+                    <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="() => _confirmingWipe = false">Cancel</button>
+                </span>
+            }
+        }
+
+        @if (_wipeMessage is not null)
+        {
+            <p class="setup-saved-message">@_wipeMessage</p>
+        }
+    </div>
 }
 
 @code {
@@ -92,6 +131,9 @@ else
     private string? _launchArgsSavedMessage;
     private readonly TimeSpan _gracefulTimeout = TimeSpan.FromSeconds(30);
     private Timer? _pollTimer;
+    private bool _hasSaveData;
+    private bool _confirmingWipe;
+    private string? _wipeMessage;
 
     protected override void OnInitialized()
     {
@@ -113,6 +155,8 @@ else
             RefreshStatus();
             _pollTimer = new Timer(_ => InvokeAsync(() => { RefreshStatus(); StateHasChanged(); }), null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
         }
+
+        _hasSaveData = ServerWipeService.HasSaveData(_installPath);
     }
 
     private void RefreshStatus()
@@ -253,6 +297,39 @@ else
         }
 
         return false;
+    }
+
+    private async Task WipeServer()
+    {
+        _confirmingWipe = false;
+
+        if (_installPath is null || _status.IsRunning)
+        {
+            return;
+        }
+
+        _busy = true;
+        _busyMessage = "Backing up and wiping…";
+        _errorMessage = null;
+        _wipeMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var backupPath = await ServerWipeService.BackupAndWipeAsync(_installPath);
+            _hasSaveData = ServerWipeService.HasSaveData(_installPath);
+            _wipeMessage = backupPath is not null
+                ? $"World wiped. Backup saved to {backupPath}"
+                : "Nothing to wipe.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to wipe: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
     private async Task SaveLaunchArguments()
