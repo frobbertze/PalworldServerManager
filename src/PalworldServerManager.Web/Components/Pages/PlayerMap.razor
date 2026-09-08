@@ -1,0 +1,131 @@
+@page "/map"
+@using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.Map
+@using PalworldServerManager.Core.RestApi
+@using PalworldServerManager.Core.Settings
+@implements IDisposable
+@inject IAppConfigService AppConfigService
+@rendermode InteractiveServer
+
+<PageTitle>Live Map</PageTitle>
+
+<h1>Live Map</h1>
+
+@if (_installPath is null)
+{
+    <p>No server install folder is configured yet. <a href="/setup">Go to Setup</a> first.</p>
+}
+else if (_loadError is not null)
+{
+    <p class="setup-status setup-status-error">@_loadError</p>
+}
+else if (_restInfo is not { Enabled: true })
+{
+    <p class="setup-status setup-status-warn">
+        The REST API is disabled for this server. Enable <strong>REST API Enabled</strong> under
+        <a href="/server-settings">Server Settings</a> (Advanced table — <code>RESTAPIEnabled</code>),
+        then restart the server, to see live player positions.
+    </p>
+}
+else
+{
+    @if (_errorMessage is not null)
+    {
+        <p class="setup-status setup-status-error">@_errorMessage</p>
+    }
+
+    <p class="setting-field-description">
+        Updates every 5 seconds. Marker positions are calibrated to the bundled map image — if they
+        look off, check the coordinate transform in <code>PalworldMapCoordinateTransform</code>.
+    </p>
+
+    <div class="palworld-map-container">
+        <img src="images/palworld-map.jpg" alt="Palworld world map" class="palworld-map-image" />
+        @if (_players is not null)
+        {
+            @foreach (var player in _players)
+            {
+                var (percentX, percentY) = PalworldMapCoordinateTransform.ToMapPercent(player.LocationX, player.LocationY);
+                <div class="palworld-map-dot" style="left: @(percentX.ToString("F2"))%; top: @(percentY.ToString("F2"))%;" title="@player.Name (Lv. @player.Level)">
+                    <span class="palworld-map-dot-label">@player.Name</span>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private string? _installPath;
+    private RestApiConnectionInfo? _restInfo;
+    private string? _loadError;
+    private string? _errorMessage;
+    private IReadOnlyList<PalworldRestPlayer>? _players;
+    private Timer? _pollTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _installPath = AppConfigService.Current.ServerInstallPath;
+        if (string.IsNullOrWhiteSpace(_installPath))
+        {
+            _installPath = null;
+            return;
+        }
+
+        await LoadConnectionInfoAsync();
+
+        if (_restInfo is { Enabled: true })
+        {
+            await RefreshPlayersAsync();
+            _pollTimer = new Timer(async _ => await InvokeAsync(async () =>
+            {
+                await RefreshPlayersAsync();
+                StateHasChanged();
+            }), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private async Task LoadConnectionInfoAsync()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        if (!PalWorldSettingsFile.Exists(_installPath))
+        {
+            _loadError = "No PalWorldSettings.ini found. Has the server been run at least once?";
+            return;
+        }
+
+        try
+        {
+            var settings = await PalWorldSettingsFile.LoadAsync(_installPath);
+            _restInfo = RestApiConnectionInfo.FromSettings(settings);
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Failed to read settings: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshPlayersAsync()
+    {
+        if (_restInfo is not { Enabled: true } info)
+        {
+            return;
+        }
+
+        try
+        {
+            using var rest = new PalworldRestApiClient(info.Host, info.Port, info.Password);
+            _players = await rest.GetPlayersAsync();
+            _errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Could not refresh players: {ex.Message}";
+        }
+    }
+
+    public void Dispose() => _pollTimer?.Dispose();
+}

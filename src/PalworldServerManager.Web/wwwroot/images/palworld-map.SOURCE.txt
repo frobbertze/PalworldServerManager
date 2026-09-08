@@ -1,0 +1,21 @@
+palworld-map.jpg — provenance and license status
+==================================================
+
+Source: https://github.com/fa0311/palworld-map (map/raw.png), downloaded 2026-09-08.
+Resized from 8192x8192 PNG (45MB) to 2048x2048 JPEG (~570KB) for use as a web page background.
+
+License status: UNCLEAR / NOT CLEARED FOR REDISTRIBUTION.
+The source repository's MIT license covers its code only. The map image itself has no
+attribution or documented license in that repo (single "init" commit, no source comment),
+and is presumed to be extracted/derived from Palworld's own game assets (Pocketpair IP).
+
+This image is kept here for PERSONAL, LOCAL-ONLY use in this admin tool. Do not publish,
+redistribute, or commit this file to a public repository without first sourcing a properly
+licensed replacement.
+
+If replacing this image (e.g. before publishing):
+1. Swap this file for a rights-clear map image (any pixel size/aspect ratio works — dots are
+   positioned by percentage, not pixels).
+2. Recalibrate PalworldServerManager.Core/Map/PalworldMapCoordinateTransform.cs by comparing a
+   real player's in-game position against where their dot lands, and adjusting the constants
+   until they line up.
