@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PalworldServerManager.Core/PalworldServerManager.Core.csproj" />
+    <Project Path="src/PalworldServerManager.Web/PalworldServerManager.Web.csproj" />
+  </Folder>
+</Solution>
