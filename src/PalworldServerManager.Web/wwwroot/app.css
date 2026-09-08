@@ -166,6 +166,38 @@ body {
     max-width: 40rem;
 }
 
+.map-layer-toggles {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 0.75rem 0;
+}
+
+.map-layer-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.map-layer-swatch {
+    display: inline-block;
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.palworld-map-resource-dot {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    transform: translate(-50%, -50%);
+}
+
 .palworld-map-container {
     position: relative;
     max-width: 900px;

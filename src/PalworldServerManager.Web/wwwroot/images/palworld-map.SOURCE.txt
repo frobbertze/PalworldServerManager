@@ -19,3 +19,13 @@ If replacing this image (e.g. before publishing):
 2. Recalibrate PalworldServerManager.Core/Map/PalworldMapCoordinateTransform.cs by comparing a
    real player's in-game position against where their dot lands, and adjusting the constants
    until they line up.
+
+
+ResourceNodeData.cs — same caveat
+==================================
+
+PalworldServerManager.Core/Map/ResourceNodeData.cs (coal/metal/quartz/sulfur node coordinates)
+is a small filtered subset (58 entries: id, category, coordinates only — no names, images, or
+other content) extracted from the same repo's public/pin_data.json, itself compiled from the
+GameWith wiki. Same status as the map image: personal/local-only use, not cleared for
+redistribution. Remove or replace before publishing.

@@ -24,12 +24,24 @@ public static class PalworldMapCoordinateTransform
     public static (double PercentX, double PercentY) ToMapPercent(double locationX, double locationY)
     {
         var (gameX, gameY) = ToGamePosition(locationX + OriginX, locationY + OriginY);
-        var (markerLat, markerLng) = ToMarkerPosition(gameX, gameY);
-
-        var percentX = markerLng / MapSize * 100.0;
-        var percentY = -markerLat / MapSize * 100.0;
-        return (percentX, percentY);
+        return MarkerToPercent(ToMarkerPosition(gameX, gameY));
     }
+
+    /// <summary>
+    /// Converts a static point-of-interest coordinate (as stored in ResourceNodeData — units
+    /// from the map-authoring tool that produced pin_data.json) into a map percentage position.
+    /// This is a different input space than player world coordinates, so it skips ToGamePosition
+    /// and applies that tool's own pin-scale factor directly, per its source (fromPinPossition
+    /// in src/app/leaflet.tsx).
+    /// </summary>
+    public static (double PercentX, double PercentY) ToMapPercentFromPin(double pinLocX, double pinLocY)
+    {
+        const double PinScale = 11;
+        return MarkerToPercent(ToMarkerPosition(pinLocX * PinScale, pinLocY * PinScale));
+    }
+
+    private static (double PercentX, double PercentY) MarkerToPercent((double Lat, double Lng) marker) =>
+        (marker.Lng / MapSize * 100.0, -marker.Lat / MapSize * 100.0);
 
     private static (double X, double Y) ToGamePosition(double x, double y)
     {

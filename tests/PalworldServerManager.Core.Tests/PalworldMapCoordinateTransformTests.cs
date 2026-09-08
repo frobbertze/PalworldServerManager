@@ -41,4 +41,24 @@ public class PalworldMapCoordinateTransformTests
 
         Assert.NotEqual(a, b);
     }
+
+    [Fact]
+    public void ToMapPercentFromPin_AtOrigin_MatchesHandComputedValue()
+    {
+        var (percentX, percentY) = PalworldMapCoordinateTransform.ToMapPercentFromPin(0, 0);
+
+        Assert.Equal(49.9499, percentX, precision: 3);
+        Assert.Equal(50.0500, percentY, precision: 3);
+    }
+
+    [Theory]
+    [InlineData(-36.45, 6.39)]  // a real metal node from ResourceNodeData
+    [InlineData(52.02, -12.15)] // a real quartz node from ResourceNodeData
+    public void ToMapPercentFromPin_RealResourceNodeCoordinates_StayWithinPlausibleRange(double x, double y)
+    {
+        var (percentX, percentY) = PalworldMapCoordinateTransform.ToMapPercentFromPin(x, y);
+
+        Assert.InRange(percentX, 0, 100);
+        Assert.InRange(percentY, 0, 100);
+    }
 }
