@@ -1,0 +1,104 @@
+@using PalworldServerManager.Core.FileSystem
+@inject IFileSystemBrowser FileSystemBrowser
+
+<div class="folder-browser">
+    <div class="folder-browser-path">
+        <button type="button" class="btn-link" disabled="@(_parentPath is null)" @onclick="GoUp" title="Up one level">⬆</button>
+        <span class="folder-browser-current-path">@_currentPath</span>
+    </div>
+
+    @if (_currentEntries.Count == 0)
+    {
+        <p class="folder-browser-empty">No subfolders here.</p>
+    }
+    else
+    {
+        <ul class="folder-browser-list">
+            @foreach (var entry in _currentEntries)
+            {
+                <li>
+                    <button type="button" class="btn-link" @onclick="() => Navigate(entry.FullPath)">📁 @entry.Name</button>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_looksLikeInstall)
+    {
+        <p class="folder-browser-hint folder-browser-hint-match">This looks like a Palworld server install.</p>
+    }
+
+    <div class="folder-browser-actions">
+        <button type="button" class="btn btn-primary" @onclick="Confirm">Select This Folder</button>
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? StartPath { get; set; }
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _currentPath = string.Empty;
+    private string? _parentPath;
+    private IReadOnlyList<DirectoryEntry> _currentEntries = [];
+    private bool _looksLikeInstall;
+
+    protected override void OnInitialized()
+    {
+        var start = !string.IsNullOrWhiteSpace(StartPath) && Directory.Exists(StartPath)
+            ? StartPath!
+            : null;
+
+        if (start is not null)
+        {
+            NavigateTo(start);
+        }
+        else
+        {
+            ShowRoots();
+        }
+    }
+
+    private void ShowRoots()
+    {
+        _currentPath = string.Empty;
+        _parentPath = null;
+        _currentEntries = FileSystemBrowser.GetRoots();
+        _looksLikeInstall = false;
+    }
+
+    private void NavigateTo(string path)
+    {
+        _currentPath = path;
+        _parentPath = FileSystemBrowser.GetParent(path);
+        _currentEntries = FileSystemBrowser.GetSubdirectories(path);
+        _looksLikeInstall = FileSystemBrowser.LooksLikePalworldServerInstall(path);
+    }
+
+    private void Navigate(string path) => NavigateTo(path);
+
+    private void GoUp()
+    {
+        if (_parentPath is not null)
+        {
+            NavigateTo(_parentPath);
+        }
+        else
+        {
+            ShowRoots();
+        }
+    }
+
+    private Task Confirm()
+    {
+        if (string.IsNullOrEmpty(_currentPath))
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnSelect.InvokeAsync(_currentPath);
+    }
+
+    private Task Cancel() => OnCancel.InvokeAsync();
+}

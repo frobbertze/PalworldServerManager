@@ -36,3 +36,164 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* --- Basic app styling (no CSS framework) --- */
+
+html {
+    color-scheme: light;
+}
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 2rem;
+    color: #1b1b1b;
+    background: #ffffff;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.btn-primary {
+    background: #2b6cb0;
+    color: white;
+}
+
+.btn-secondary {
+    background: #edf2f7;
+    color: #1b1b1b;
+    border-color: #cbd5e0;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: #2b6cb0;
+    cursor: pointer;
+    padding: 0.15rem 0.3rem;
+    text-align: left;
+    font-size: 0.95rem;
+}
+
+.btn-link:disabled {
+    color: #a0aec0;
+    cursor: not-allowed;
+}
+
+.setup-field {
+    margin: 1rem 0;
+}
+
+.setup-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+}
+
+.setup-field-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.setup-field-row input[type=text] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.setup-status {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.setup-status-ok {
+    color: #2f855a;
+}
+
+.setup-status-warn {
+    color: #b7791f;
+}
+
+.setup-status-error {
+    color: #c53030;
+}
+
+.setup-actions {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.setup-saved-message {
+    color: #2f855a;
+    font-size: 0.9rem;
+}
+
+.folder-browser {
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 0.75rem 0;
+    max-width: 32rem;
+    background: #f7fafc;
+}
+
+.folder-browser-path {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-family: Consolas, monospace;
+    font-size: 0.9rem;
+}
+
+.folder-browser-current-path {
+    word-break: break-all;
+}
+
+.folder-browser-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 14rem;
+    overflow-y: auto;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.folder-browser-list li {
+    padding: 0.1rem 0;
+}
+
+.folder-browser-empty {
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.folder-browser-hint {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.folder-browser-hint-match {
+    color: #2f855a;
+    font-weight: 600;
+}
+
+.folder-browser-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+}

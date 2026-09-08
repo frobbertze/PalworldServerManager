@@ -1,0 +1,98 @@
+@page "/setup"
+@using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.FileSystem
+@inject IAppConfigService AppConfigService
+@inject IFileSystemBrowser FileSystemBrowser
+@rendermode InteractiveServer
+
+<PageTitle>Setup</PageTitle>
+
+<h1>Server Setup</h1>
+
+<p>Point this tool at the folder where your Palworld dedicated server is installed.</p>
+
+<div class="setup-field">
+    <label for="install-path">Server install folder</label>
+    <div class="setup-field-row">
+        <input id="install-path" type="text" @bind="_installPath" @bind:event="oninput" placeholder="e.g. F:\PalworldServer" />
+        <button type="button" class="btn btn-secondary" @onclick="ToggleBrowser">Browse…</button>
+    </div>
+
+    @if (_validated)
+    {
+        @if (_pathExists && _looksLikeInstall)
+        {
+            <p class="setup-status setup-status-ok">✔ Looks like a valid Palworld server install.</p>
+        }
+        else if (_pathExists)
+        {
+            <p class="setup-status setup-status-warn">⚠ Folder exists, but doesn't look like a Palworld server install (no PalServer.exe/PalServer.sh found). You can still save it.</p>
+        }
+        else
+        {
+            <p class="setup-status setup-status-error">✘ This folder doesn't exist.</p>
+        }
+    }
+</div>
+
+@if (_showBrowser)
+{
+    <FolderBrowser StartPath="@_installPath" OnSelect="OnFolderSelected" OnCancel="() => _showBrowser = false" />
+}
+
+<div class="setup-actions">
+    <button type="button" class="btn btn-primary" @onclick="Save" disabled="@string.IsNullOrWhiteSpace(_installPath)">Save</button>
+    @if (_savedMessage is not null)
+    {
+        <span class="setup-saved-message">@_savedMessage</span>
+    }
+</div>
+
+@code {
+    private string? _installPath;
+    private bool _showBrowser;
+    private bool _validated;
+    private bool _pathExists;
+    private bool _looksLikeInstall;
+    private string? _savedMessage;
+
+    protected override void OnInitialized()
+    {
+        _installPath = AppConfigService.Current.ServerInstallPath;
+        Validate();
+    }
+
+    private void ToggleBrowser() => _showBrowser = !_showBrowser;
+
+    private void OnFolderSelected(string path)
+    {
+        _installPath = path;
+        _showBrowser = false;
+        Validate();
+    }
+
+    private void Validate()
+    {
+        _savedMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_installPath))
+        {
+            _validated = false;
+            return;
+        }
+
+        _pathExists = Directory.Exists(_installPath);
+        _looksLikeInstall = _pathExists && FileSystemBrowser.LooksLikePalworldServerInstall(_installPath);
+        _validated = true;
+    }
+
+    private async Task Save()
+    {
+        Validate();
+
+        var config = new AppConfig { ServerInstallPath = _installPath };
+        await AppConfigService.SaveAsync(config);
+
+        _savedMessage = "Saved.";
+    }
+}
