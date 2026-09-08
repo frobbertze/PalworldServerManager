@@ -1,0 +1,68 @@
+@using PalworldServerManager.Core.Settings
+
+<div class="setting-field">
+    <label>@Definition.Label</label>
+
+    @switch (Definition.ControlType)
+    {
+        case SettingControlType.Toggle:
+            <input type="checkbox" @bind:get="BoolValue" @bind:set="SetBoolValue" />
+            break;
+
+        case SettingControlType.FloatSlider:
+            <div class="setting-field-slider-row">
+                <input type="range" min="@Definition.Min" max="@Definition.Max" step="@Definition.Step"
+                       @bind:get="FloatValue" @bind:set="SetFloatValue" />
+                <input type="number" min="@Definition.Min" max="@Definition.Max" step="@Definition.Step"
+                       class="setting-field-number" @bind:get="FloatValue" @bind:set="SetFloatValue" />
+            </div>
+            break;
+
+        case SettingControlType.IntNumber:
+            <input type="number" min="@Definition.Min" max="@Definition.Max" step="1"
+                   @bind:get="IntValue" @bind:set="SetIntValue" />
+            break;
+
+        case SettingControlType.Dropdown:
+            <select @bind:get="RawValue" @bind:set="SetRawValue">
+                @foreach (var option in Definition.DropdownOptions ?? [])
+                {
+                    <option value="@option">@option</option>
+                }
+            </select>
+            break;
+
+        default:
+            <input type="text" @bind:get="StringValue" @bind:set="SetStringValue" />
+            break;
+    }
+
+    @if (!string.IsNullOrEmpty(Definition.Description))
+    {
+        <p class="setting-field-description">@Definition.Description</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingDefinition Definition { get; set; } = null!;
+    [Parameter, EditorRequired] public PalWorldOptionSettings Settings { get; set; } = null!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool BoolValue => Settings.GetBool(Definition.Key);
+    private float FloatValue => Settings.GetFloat(Definition.Key);
+    private int IntValue => Settings.GetInt(Definition.Key);
+    private string StringValue => Settings.GetString(Definition.Key);
+    private string RawValue => Settings.GetRaw(Definition.Key) ?? string.Empty;
+
+    private Task SetBoolValue(bool value) => Apply(() => Settings.SetBool(Definition.Key, value));
+    private Task SetFloatValue(float value) => Apply(() => Settings.SetFloat(Definition.Key, value));
+    private Task SetIntValue(int value) => Apply(() => Settings.SetInt(Definition.Key, value));
+    private Task SetStringValue(string value) => Apply(() => Settings.SetString(Definition.Key, value));
+    private Task SetRawValue(string value) => Apply(() => Settings.SetRaw(Definition.Key, value));
+
+    private Task Apply(Action mutate)
+    {
+        mutate();
+        return OnChanged.InvokeAsync();
+    }
+}

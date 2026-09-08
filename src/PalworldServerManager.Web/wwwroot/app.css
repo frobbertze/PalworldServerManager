@@ -197,3 +197,111 @@ body {
     display: flex;
     gap: 0.5rem;
 }
+
+.settings-source-path {
+    font-size: 0.85rem;
+    color: #4a5568;
+}
+
+.settings-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+    padding: 0.5rem 0;
+    z-index: 1;
+}
+
+.settings-dirty-message {
+    color: #b7791f;
+    font-size: 0.9rem;
+}
+
+.settings-group {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.75rem 1rem 1rem;
+    margin-bottom: 1.25rem;
+    max-width: 40rem;
+}
+
+.settings-group legend {
+    font-weight: 600;
+    padding: 0 0.4rem;
+}
+
+.setting-field {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.setting-field:last-child {
+    border-bottom: none;
+}
+
+.setting-field label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 0.3rem;
+}
+
+.setting-field-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.setting-field-slider-row input[type=range] {
+    flex: 1;
+}
+
+.setting-field-number {
+    width: 5.5rem;
+}
+
+.setting-field-description {
+    margin: 0.25rem 0 0;
+    font-size: 0.8rem;
+    color: #718096;
+}
+
+.settings-advanced {
+    margin-top: 1.5rem;
+    max-width: 48rem;
+}
+
+.settings-advanced summary {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.settings-advanced-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.settings-advanced-table th,
+.settings-advanced-table td {
+    text-align: left;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.settings-advanced-table th:first-child,
+.settings-advanced-table td:first-child {
+    font-family: Consolas, monospace;
+    white-space: nowrap;
+}
+
+.settings-advanced-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+}

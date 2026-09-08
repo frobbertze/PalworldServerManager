@@ -1,0 +1,135 @@
+@page "/server-settings"
+@using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.Settings
+@inject IAppConfigService AppConfigService
+@rendermode InteractiveServer
+
+<PageTitle>Server Settings</PageTitle>
+
+<h1>Server Settings</h1>
+
+@if (_installPath is null)
+{
+    <p>No server install folder is configured yet. <a href="/setup">Go to Setup</a> first.</p>
+}
+else if (_loadError is not null)
+{
+    <p class="setup-status setup-status-error">@_loadError</p>
+}
+else if (_settings is null)
+{
+    <p>Loading…</p>
+}
+else
+{
+    <p class="settings-source-path">Editing: <code>@PalWorldSettingsFile.ResolvePath(_installPath)</code></p>
+
+    <div class="settings-actions">
+        <button type="button" class="btn btn-primary" @onclick="Save">Save</button>
+        @if (_isDirty)
+        {
+            <span class="settings-dirty-message">Unsaved changes</span>
+        }
+        @if (_savedMessage is not null)
+        {
+            <span class="setup-saved-message">@_savedMessage</span>
+        }
+    </div>
+
+    <h2>Quick Settings</h2>
+    @foreach (var group in KnownSettings.ByCategory())
+    {
+        <fieldset class="settings-group">
+            <legend>@group.Key</legend>
+            @foreach (var definition in group)
+            {
+                @if (_settings.ContainsKey(definition.Key))
+                {
+                    <SettingFieldEditor Definition="definition" Settings="_settings" OnChanged="OnFieldChanged" />
+                }
+            }
+        </fieldset>
+    }
+
+    <details class="settings-advanced">
+        <summary>Advanced — all @_settings.Keys.Count settings (raw)</summary>
+        <table class="settings-advanced-table">
+            <thead>
+                <tr>
+                    <th>Key</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var key in _settings.Keys)
+                {
+                    <tr>
+                        <td>@key</td>
+                        <td>
+                            <input type="text" class="settings-advanced-input"
+                                   value="@_settings.GetRaw(key)"
+                                   @onchange="e => OnRawValueChanged(key, e)" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </details>
+}
+
+@code {
+    private string? _installPath;
+    private PalWorldOptionSettings? _settings;
+    private string? _loadError;
+    private string? _savedMessage;
+    private bool _isDirty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _installPath = AppConfigService.Current.ServerInstallPath;
+        if (string.IsNullOrWhiteSpace(_installPath))
+        {
+            _installPath = null;
+            return;
+        }
+
+        if (!PalWorldSettingsFile.Exists(_installPath))
+        {
+            _loadError = $"No PalWorldSettings.ini found under '{_installPath}'. Has the server been run at least once?";
+            return;
+        }
+
+        try
+        {
+            _settings = await PalWorldSettingsFile.LoadAsync(_installPath);
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Failed to read settings: {ex.Message}";
+        }
+    }
+
+    private void OnFieldChanged()
+    {
+        _isDirty = true;
+        _savedMessage = null;
+    }
+
+    private void OnRawValueChanged(string key, ChangeEventArgs e)
+    {
+        _settings!.SetRaw(key, e.Value?.ToString() ?? string.Empty);
+        OnFieldChanged();
+    }
+
+    private async Task Save()
+    {
+        if (_installPath is null || _settings is null)
+        {
+            return;
+        }
+
+        await PalWorldSettingsFile.SaveAsync(_installPath, _settings);
+        _isDirty = false;
+        _savedMessage = "Saved. A backup of the previous file was kept alongside it.";
+    }
+}
