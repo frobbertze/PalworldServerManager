@@ -1,5 +1,7 @@
 @page "/server-control"
 @using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.Rcon
+@using PalworldServerManager.Core.Settings
 @using PalworldServerManager.Core.ServerProcess
 @implements IDisposable
 @inject IAppConfigService AppConfigService
@@ -57,7 +59,11 @@ else
             <span class="control-busy-message">@_busyMessage</span>
         }
     </div>
-    <p class="setting-field-description">Stop first asks the server to shut down cleanly (so it can save); if it hasn't exited after @_gracefulTimeout.TotalSeconds seconds, it's force-closed.</p>
+    <p class="setting-field-description">
+        Stop first asks the server to shut down cleanly via RCON (so it can save) if RCON is enabled in
+        <a href="/server-settings">Server Settings</a>; otherwise, or if that doesn't work, it's force-closed
+        after @_gracefulTimeout.TotalSeconds seconds.
+    </p>
 
     <h2>Launch Options</h2>
     <div class="setup-field">
@@ -173,7 +179,14 @@ else
 
         try
         {
-            await ServerProcessManager.StopAsync(_installPath, _gracefulTimeout);
+            var stoppedGracefully = await TryStopViaRconAsync();
+            if (!stoppedGracefully)
+            {
+                _busyMessage = "Forcing stop…";
+                StateHasChanged();
+                await ServerProcessManager.StopAsync(_installPath, _gracefulTimeout);
+            }
+
             RefreshStatus();
         }
         catch (Exception ex)
@@ -184,6 +197,62 @@ else
         {
             _busy = false;
         }
+    }
+
+    /// <summary>Tries a clean RCON shutdown (server saves, then exits on its own).
+    /// Returns false if RCON isn't enabled/reachable, or the server hasn't exited
+    /// within the grace period — in which case the caller falls back to force-killing it.</summary>
+    private async Task<bool> TryStopViaRconAsync()
+    {
+        if (_installPath is null)
+        {
+            return false;
+        }
+
+        PalWorldOptionSettings settings;
+        try
+        {
+            settings = await PalWorldSettingsFile.LoadAsync(_installPath);
+        }
+        catch
+        {
+            return false;
+        }
+
+        var connectionInfo = RconConnectionInfo.FromSettings(settings);
+        if (!connectionInfo.Enabled)
+        {
+            return false;
+        }
+
+        _busyMessage = "Requesting graceful shutdown via RCON…";
+        StateHasChanged();
+
+        try
+        {
+            await using var rcon = await PalworldRconClient.ConnectAsync(connectionInfo.Host, connectionInfo.Port, connectionInfo.Password);
+            await rcon.ShutdownAsync(5, "Server shutting down");
+        }
+        catch
+        {
+            return false;
+        }
+
+        _busyMessage = "Waiting for server to save and exit…";
+        StateHasChanged();
+
+        var deadline = DateTime.UtcNow + _gracefulTimeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!ServerProcessManager.GetStatus(_installPath).IsRunning)
+            {
+                return true;
+            }
+
+            await Task.Delay(1000);
+        }
+
+        return false;
     }
 
     private async Task SaveLaunchArguments()

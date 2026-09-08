@@ -1,0 +1,241 @@
+@page "/rcon"
+@using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.Rcon
+@using PalworldServerManager.Core.Settings
+@inject IAppConfigService AppConfigService
+@rendermode InteractiveServer
+
+<PageTitle>Live Console</PageTitle>
+
+<h1>Live Console</h1>
+
+@if (_installPath is null)
+{
+    <p>No server install folder is configured yet. <a href="/setup">Go to Setup</a> first.</p>
+}
+else if (_loadError is not null)
+{
+    <p class="setup-status setup-status-error">@_loadError</p>
+}
+else if (_connectionInfo is not { Enabled: true })
+{
+    <p class="setup-status setup-status-warn">
+        RCON is disabled for this server. Enable <strong>RCON Enabled</strong> (and set an Admin Password)
+        under <a href="/server-settings">Server Settings</a>, then restart the server, to use the live console.
+    </p>
+}
+else
+{
+    <div class="control-actions">
+        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="RefreshPlayers">Refresh Players</button>
+        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="RefreshInfo">Server Info</button>
+        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="SaveWorld">Save World</button>
+        @if (_busy)
+        {
+            <span class="control-busy-message">Working…</span>
+        }
+    </div>
+
+    @if (_errorMessage is not null)
+    {
+        <p class="setup-status setup-status-error">@_errorMessage</p>
+    }
+
+    @if (_statusMessage is not null)
+    {
+        <p class="setup-saved-message">@_statusMessage</p>
+    }
+
+    @if (_serverInfo is not null)
+    {
+        <p class="settings-source-path">@_serverInfo</p>
+    }
+
+    <h2>Players @(_players is not null ? $"({_players.Count})" : "")</h2>
+    @if (_players is null)
+    {
+        <p class="setting-field-description">Click "Refresh Players" to load the current player list.</p>
+    }
+    else if (_players.Count == 0)
+    {
+        <p class="setting-field-description">No players online.</p>
+    }
+    else
+    {
+        <table class="settings-advanced-table rcon-players-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Player UID</th>
+                    <th>Steam ID</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var player in _players)
+                {
+                    <tr>
+                        <td>@player.Name</td>
+                        <td>@player.PlayerUid</td>
+                        <td>@player.SteamId</td>
+                        <td><button type="button" class="btn-link" disabled="@_busy" @onclick="() => KickPlayer(player)">Kick</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <h2>Broadcast</h2>
+    <div class="setup-field-row">
+        <input type="text" @bind="_broadcastMessage" @bind:event="oninput" placeholder="Message to send to all players" />
+        <button type="button" class="btn btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_broadcastMessage))" @onclick="SendBroadcast">Send</button>
+    </div>
+    <p class="setting-field-description">Spaces are sent as underscores in-game — a known Palworld RCON quirk, handled automatically.</p>
+
+    <h2>Raw Command</h2>
+    <div class="setup-field-row">
+        <input type="text" @bind="_rawCommand" @bind:event="oninput" placeholder="e.g. Info" @onkeydown="OnRawCommandKeyDown" />
+        <button type="button" class="btn btn-secondary" disabled="@(_busy || string.IsNullOrWhiteSpace(_rawCommand))" @onclick="SendRawCommand">Send</button>
+    </div>
+    @if (_rawResponse is not null)
+    {
+        <pre class="rcon-raw-response">@_rawResponse</pre>
+    }
+}
+
+@code {
+    private string? _installPath;
+    private RconConnectionInfo? _connectionInfo;
+    private string? _loadError;
+    private string? _errorMessage;
+    private string? _statusMessage;
+    private bool _busy;
+
+    private IReadOnlyList<PalworldPlayer>? _players;
+    private string? _serverInfo;
+    private string _broadcastMessage = string.Empty;
+    private string _rawCommand = string.Empty;
+    private string? _rawResponse;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _installPath = AppConfigService.Current.ServerInstallPath;
+        if (string.IsNullOrWhiteSpace(_installPath))
+        {
+            _installPath = null;
+            return;
+        }
+
+        await LoadConnectionInfoAsync();
+    }
+
+    private async Task LoadConnectionInfoAsync()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        if (!PalWorldSettingsFile.Exists(_installPath))
+        {
+            _loadError = "No PalWorldSettings.ini found. Has the server been run at least once?";
+            return;
+        }
+
+        try
+        {
+            var settings = await PalWorldSettingsFile.LoadAsync(_installPath);
+            _connectionInfo = RconConnectionInfo.FromSettings(settings);
+        }
+        catch (Exception ex)
+        {
+            _loadError = $"Failed to read settings: {ex.Message}";
+        }
+    }
+
+    private async Task<PalworldRconClient?> ConnectAsync()
+    {
+        // Reload connection info each time in case settings changed since the page loaded.
+        await LoadConnectionInfoAsync();
+
+        if (_connectionInfo is not { Enabled: true } info)
+        {
+            _errorMessage = "RCON is not enabled.";
+            return null;
+        }
+
+        try
+        {
+            return await PalworldRconClient.ConnectAsync(info.Host, info.Port, info.Password);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Could not connect to RCON: {ex.Message}";
+            return null;
+        }
+    }
+
+    private async Task RunAsync(Func<PalworldRconClient, Task> action)
+    {
+        _busy = true;
+        _errorMessage = null;
+        _statusMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await using var rcon = await ConnectAsync();
+            if (rcon is null)
+            {
+                return;
+            }
+
+            await action(rcon);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Command failed: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task RefreshPlayers() => RunAsync(async rcon => _players = await rcon.ShowPlayersAsync());
+
+    private Task RefreshInfo() => RunAsync(async rcon => _serverInfo = await rcon.GetInfoAsync());
+
+    private Task SaveWorld() => RunAsync(async rcon =>
+    {
+        await rcon.SaveAsync();
+        _statusMessage = "World saved.";
+    });
+
+    private Task SendBroadcast() => RunAsync(async rcon =>
+    {
+        await rcon.BroadcastAsync(_broadcastMessage);
+        _statusMessage = "Broadcast sent.";
+        _broadcastMessage = string.Empty;
+    });
+
+    private Task KickPlayer(PalworldPlayer player) => RunAsync(async rcon =>
+    {
+        await rcon.KickPlayerAsync(player.SteamId);
+        _statusMessage = $"Kicked {player.Name}.";
+        _players = await rcon.ShowPlayersAsync();
+    });
+
+    private Task SendRawCommand() => RunAsync(async rcon =>
+    {
+        _rawResponse = await rcon.ExecuteRawAsync(_rawCommand);
+    });
+
+    private async Task OnRawCommandKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !_busy && !string.IsNullOrWhiteSpace(_rawCommand))
+        {
+            await SendRawCommand();
+        }
+    }
+}

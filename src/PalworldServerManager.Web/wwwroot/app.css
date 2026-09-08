@@ -158,6 +158,23 @@ body {
     font-size: 0.9rem;
 }
 
+.rcon-players-table {
+    max-width: 48rem;
+    margin-bottom: 1rem;
+}
+
+.rcon-raw-response {
+    background: #1a202c;
+    color: #e2e8f0;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    max-width: 48rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .btn {
     padding: 0.5rem 1rem;
     border-radius: 4px;
