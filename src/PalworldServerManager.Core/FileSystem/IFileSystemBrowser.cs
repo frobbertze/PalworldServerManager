@@ -8,6 +8,9 @@ public interface IFileSystemBrowser
     /// <summary>Immediate subdirectories of <paramref name="path"/>, sorted by name. Inaccessible entries are silently skipped.</summary>
     IReadOnlyList<DirectoryEntry> GetSubdirectories(string path);
 
+    /// <summary>Immediate files in <paramref name="path"/> matching <paramref name="searchPattern"/> (e.g. "*.zip"), sorted by name.</summary>
+    IReadOnlyList<DirectoryEntry> GetFiles(string path, string searchPattern);
+
     /// <summary>The parent directory of <paramref name="path"/>, or null if it's already a root.</summary>
     string? GetParent(string path);
 

@@ -36,6 +36,21 @@ public class FileSystemBrowser : IFileSystemBrowser
         }
     }
 
+    public IReadOnlyList<DirectoryEntry> GetFiles(string path, string searchPattern)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(path, searchPattern)
+                .Select(file => new DirectoryEntry(Path.GetFileName(file), file))
+                .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or SecurityException)
+        {
+            return [];
+        }
+    }
+
     public string? GetParent(string path)
     {
         var parent = Directory.GetParent(path);

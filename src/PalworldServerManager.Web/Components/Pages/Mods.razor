@@ -1,0 +1,273 @@
+@page "/mods"
+@using PalworldServerManager.Core.Configuration
+@using PalworldServerManager.Core.Mods
+@inject IAppConfigService AppConfigService
+@rendermode InteractiveServer
+
+<PageTitle>Mods</PageTitle>
+
+<h1>Mods</h1>
+
+@if (_installPath is null)
+{
+    <p>No server install folder is configured yet. <a href="/setup">Go to Setup</a> first.</p>
+}
+else
+{
+    <h2>UE4SS Framework</h2>
+    @if (_ue4ssInstalled)
+    {
+        <p class="setup-status setup-status-ok">✔ UE4SS is installed.</p>
+    }
+    else
+    {
+        <p class="setup-status setup-status-warn">UE4SS is not installed. This tool won't download it for you — browse to a UE4SS release zip you've already downloaded.</p>
+
+        @if (_ue4ssErrorMessage is not null)
+        {
+            <p class="setup-status setup-status-error">@_ue4ssErrorMessage</p>
+        }
+
+        @if (_ue4ssSelectedZip is null)
+        {
+            @if (!_showingUe4ssPicker)
+            {
+                <button type="button" class="btn btn-secondary" @onclick="() => _showingUe4ssPicker = true">Browse for UE4SS zip…</button>
+            }
+            else
+            {
+                <FilePicker SearchPattern="*.zip" OnSelect="OnUe4ssZipSelected" OnCancel="() => _showingUe4ssPicker = false" />
+            }
+        }
+        else
+        {
+            <p class="settings-source-path">Selected: <code>@_ue4ssSelectedZip</code></p>
+            <div class="control-actions">
+                <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="InstallUe4ss">Install</button>
+                <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="() => _ue4ssSelectedZip = null">Cancel</button>
+            </div>
+        }
+    }
+
+    <h2>Integrated Storage</h2>
+    <p class="setting-field-description">
+        Links every base camp's storage into one shared pool.
+        (<a href="https://www.nexusmods.com/palworld/mods/2028" target="_blank" rel="noopener">Nexus Mods page</a>)
+    </p>
+
+    @if (!_ue4ssInstalled)
+    {
+        <p class="setup-status setup-status-warn">Install UE4SS first.</p>
+    }
+    else
+    {
+        @if (_modErrorMessage is not null)
+        {
+            <p class="setup-status setup-status-error">@_modErrorMessage</p>
+        }
+
+        @if (_modStatusMessage is not null)
+        {
+            <p class="setup-saved-message">@_modStatusMessage</p>
+        }
+
+        @if (!_modInstalled)
+        {
+            @if (_modSelectedZip is null)
+            {
+                @if (!_showingModPicker)
+                {
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showingModPicker = true">Browse for mod zip…</button>
+                }
+                else
+                {
+                    <FilePicker SearchPattern="*.zip" OnSelect="OnModZipSelected" OnCancel="() => _showingModPicker = false" />
+                }
+            }
+            else
+            {
+                <p class="settings-source-path">Selected: <code>@_modSelectedZip</code></p>
+                <div class="control-actions">
+                    <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="InstallMod">Install</button>
+                    <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="() => _modSelectedZip = null">Cancel</button>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="control-actions">
+                <label class="map-layer-toggle">
+                    <input type="checkbox" checked="@_modEnabled" @onchange="OnEnabledChanged" />
+                    Enabled
+                </label>
+            </div>
+
+            @if (_modHasConfig)
+            {
+                @if (!_showingConfigEditor)
+                {
+                    <button type="button" class="btn btn-secondary" @onclick="OpenConfigEditor">Edit config.txt</button>
+                }
+                else
+                {
+                    <div class="setup-field">
+                        <textarea class="mods-config-editor" @bind="_configText" @bind:event="oninput"></textarea>
+                        <div class="control-actions">
+                            <button type="button" class="btn btn-primary" @onclick="SaveConfig">Save</button>
+                            <button type="button" class="btn btn-secondary" @onclick="() => _showingConfigEditor = false">Close</button>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    }
+}
+
+@code {
+    private string? _installPath;
+    private bool _busy;
+
+    private bool _ue4ssInstalled;
+    private bool _showingUe4ssPicker;
+    private string? _ue4ssSelectedZip;
+    private string? _ue4ssErrorMessage;
+
+    private bool _modInstalled;
+    private bool _modEnabled;
+    private bool _modHasConfig;
+    private bool _showingModPicker;
+    private string? _modSelectedZip;
+    private string? _modErrorMessage;
+    private string? _modStatusMessage;
+    private bool _showingConfigEditor;
+    private string _configText = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _installPath = AppConfigService.Current.ServerInstallPath;
+        if (string.IsNullOrWhiteSpace(_installPath))
+        {
+            _installPath = null;
+            return;
+        }
+
+        RefreshStatus();
+    }
+
+    private void RefreshStatus()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        _ue4ssInstalled = Ue4ssManager.IsInstalled(_installPath);
+        _modInstalled = IntegratedStorageModManager.IsInstalled(_installPath);
+        _modEnabled = _modInstalled && IntegratedStorageModManager.IsEnabled(_installPath);
+        _modHasConfig = _modInstalled && IntegratedStorageModManager.HasConfig(_installPath);
+    }
+
+    private void OnUe4ssZipSelected(string path)
+    {
+        _ue4ssSelectedZip = path;
+        _showingUe4ssPicker = false;
+        _ue4ssErrorMessage = null;
+    }
+
+    private async Task InstallUe4ss()
+    {
+        if (_installPath is null || _ue4ssSelectedZip is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _ue4ssErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Run(() => Ue4ssManager.InstallFromZip(_installPath, _ue4ssSelectedZip));
+            _ue4ssSelectedZip = null;
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            _ue4ssErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OnModZipSelected(string path)
+    {
+        _modSelectedZip = path;
+        _showingModPicker = false;
+        _modErrorMessage = null;
+    }
+
+    private async Task InstallMod()
+    {
+        if (_installPath is null || _modSelectedZip is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _modErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Run(() => IntegratedStorageModManager.InstallFromZip(_installPath, _modSelectedZip));
+            _modSelectedZip = null;
+            _modStatusMessage = "Installed.";
+            RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            _modErrorMessage = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OnEnabledChanged(ChangeEventArgs e)
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        var enabled = e.Value is true;
+        IntegratedStorageModManager.SetEnabled(_installPath, enabled);
+        _modEnabled = enabled;
+        _modStatusMessage = enabled ? "Enabled." : "Disabled.";
+    }
+
+    private void OpenConfigEditor()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        _configText = IntegratedStorageModManager.ReadConfig(_installPath);
+        _showingConfigEditor = true;
+    }
+
+    private void SaveConfig()
+    {
+        if (_installPath is null)
+        {
+            return;
+        }
+
+        IntegratedStorageModManager.WriteConfig(_installPath, _configText);
+        _modStatusMessage = "config.txt saved.";
+    }
+}
