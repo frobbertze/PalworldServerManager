@@ -166,6 +166,33 @@ body {
     max-width: 40rem;
 }
 
+.rcon-metrics-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+}
+
+.rcon-metric {
+    display: flex;
+    flex-direction: column;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    min-width: 5.5rem;
+}
+
+.rcon-metric-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.rcon-metric-label {
+    font-size: 0.75rem;
+    color: #718096;
+}
+
 .rcon-players-table {
     max-width: 48rem;
     margin-bottom: 1rem;

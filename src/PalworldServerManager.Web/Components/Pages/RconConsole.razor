@@ -1,6 +1,7 @@
 @page "/rcon"
 @using PalworldServerManager.Core.Configuration
 @using PalworldServerManager.Core.Rcon
+@using PalworldServerManager.Core.RestApi
 @using PalworldServerManager.Core.Settings
 @inject IAppConfigService AppConfigService
 @rendermode InteractiveServer
@@ -17,102 +18,131 @@ else if (_loadError is not null)
 {
     <p class="setup-status setup-status-error">@_loadError</p>
 }
-else if (_connectionInfo is not { Enabled: true })
-{
-    <p class="setup-status setup-status-warn">
-        RCON is disabled for this server. Enable <strong>RCON Enabled</strong> (and set an Admin Password)
-        under <a href="/server-settings">Server Settings</a>, then restart the server, to use the live console.
-    </p>
-}
 else
 {
-    <div class="control-actions">
-        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="RefreshPlayers">Refresh Players</button>
-        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="RefreshInfo">Server Info</button>
-        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="SaveWorld">Save World</button>
-        @if (_busy)
-        {
-            <span class="control-busy-message">Working…</span>
-        }
-    </div>
-
-    @if (_errorMessage is not null)
+    @if (_restInfo is not { Enabled: true })
     {
-        <p class="setup-status setup-status-error">@_errorMessage</p>
-    }
-
-    @if (_statusMessage is not null)
-    {
-        <p class="setup-saved-message">@_statusMessage</p>
-    }
-
-    @if (_serverInfo is not null)
-    {
-        <p class="settings-source-path">@_serverInfo</p>
-    }
-
-    <h2>Players @(_players is not null ? $"({_players.Count})" : "")</h2>
-    @if (_players is null)
-    {
-        <p class="setting-field-description">Click "Refresh Players" to load the current player list.</p>
-    }
-    else if (_players.Count == 0)
-    {
-        <p class="setting-field-description">No players online.</p>
+        <p class="setup-status setup-status-warn">
+            The REST API is disabled for this server. Enable <strong>REST API Enabled</strong> under
+            <a href="/server-settings">Server Settings</a> (Advanced table — <code>RESTAPIEnabled</code>), then
+            restart the server, for players/stats/broadcast/save here.
+        </p>
     }
     else
     {
-        <table class="settings-advanced-table rcon-players-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Player UID</th>
-                    <th>Steam ID</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var player in _players)
-                {
+        <div class="control-actions">
+            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="RefreshAll">Refresh</button>
+            <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="SaveWorld">Save World</button>
+            @if (_busy)
+            {
+                <span class="control-busy-message">Working…</span>
+            }
+        </div>
+
+        @if (_errorMessage is not null)
+        {
+            <p class="setup-status setup-status-error">@_errorMessage</p>
+        }
+
+        @if (_statusMessage is not null)
+        {
+            <p class="setup-saved-message">@_statusMessage</p>
+        }
+
+        @if (_serverInfo is not null)
+        {
+            <p class="settings-source-path">@_serverInfo.ServerName — v@_serverInfo.Version</p>
+        }
+
+        @if (_metrics is not null)
+        {
+            <div class="rcon-metrics-row">
+                <div class="rcon-metric"><span class="rcon-metric-value">@_metrics.CurrentPlayerNum/@_metrics.MaxPlayerNum</span><span class="rcon-metric-label">Players</span></div>
+                <div class="rcon-metric"><span class="rcon-metric-value">@_metrics.ServerFps</span><span class="rcon-metric-label">FPS</span></div>
+                <div class="rcon-metric"><span class="rcon-metric-value">Day @_metrics.Days</span><span class="rcon-metric-label">In-game</span></div>
+                <div class="rcon-metric"><span class="rcon-metric-value">@FormatUptime(_metrics.Uptime)</span><span class="rcon-metric-label">Uptime</span></div>
+                <div class="rcon-metric"><span class="rcon-metric-value">@_metrics.BaseCampNum</span><span class="rcon-metric-label">Base Camps</span></div>
+            </div>
+        }
+
+        <h2>Players @(_players is not null ? $"({_players.Count})" : "")</h2>
+        @if (_players is null)
+        {
+            <p class="setting-field-description">Click "Refresh" to load the current player list.</p>
+        }
+        else if (_players.Count == 0)
+        {
+            <p class="setting-field-description">No players online.</p>
+        }
+        else
+        {
+            <table class="settings-advanced-table rcon-players-table">
+                <thead>
                     <tr>
-                        <td>@player.Name</td>
-                        <td>@player.PlayerUid</td>
-                        <td>@player.SteamId</td>
-                        <td><button type="button" class="btn-link" disabled="@_busy" @onclick="() => KickPlayer(player)">Kick</button></td>
+                        <th>Name</th>
+                        <th>Level</th>
+                        <th>Location (x, y)</th>
+                        <th>Buildings</th>
+                        <th>Ping</th>
+                        <th></th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var player in _players)
+                    {
+                        <tr>
+                            <td>@player.Name</td>
+                            <td>@player.Level</td>
+                            <td>@player.LocationX.ToString("F0"), @player.LocationY.ToString("F0")</td>
+                            <td>@player.BuildingCount</td>
+                            <td>@player.Ping.ToString("F0")ms</td>
+                            <td><button type="button" class="btn-link" disabled="@_busy" @onclick="() => KickPlayer(player)">Kick</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h2>Broadcast</h2>
+        <div class="setup-field-row">
+            <input type="text" @bind="_broadcastMessage" @bind:event="oninput" placeholder="Message to send to all players" />
+            <button type="button" class="btn btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_broadcastMessage))" @onclick="SendBroadcast">Send</button>
+        </div>
     }
 
-    <h2>Broadcast</h2>
-    <div class="setup-field-row">
-        <input type="text" @bind="_broadcastMessage" @bind:event="oninput" placeholder="Message to send to all players" />
-        <button type="button" class="btn btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_broadcastMessage))" @onclick="SendBroadcast">Send</button>
-    </div>
-    <p class="setting-field-description">Spaces are sent as underscores in-game — a known Palworld RCON quirk, handled automatically.</p>
-
-    <h2>Raw Command</h2>
-    <div class="setup-field-row">
-        <input type="text" @bind="_rawCommand" @bind:event="oninput" placeholder="e.g. Info" @onkeydown="OnRawCommandKeyDown" />
-        <button type="button" class="btn btn-secondary" disabled="@(_busy || string.IsNullOrWhiteSpace(_rawCommand))" @onclick="SendRawCommand">Send</button>
-    </div>
-    @if (_rawResponse is not null)
+    <h2>Raw Command (RCON)</h2>
+    @if (_rconInfo is not { Enabled: true })
     {
-        <pre class="rcon-raw-response">@_rawResponse</pre>
+        <p class="setting-field-description">
+            Enable <strong>RCON Enabled</strong> under <a href="/server-settings">Server Settings</a> to run raw
+            admin console commands — the REST API above doesn't expose an arbitrary-command endpoint.
+        </p>
+    }
+    else
+    {
+        <div class="setup-field-row">
+            <input type="text" @bind="_rawCommand" @bind:event="oninput" placeholder="e.g. Info" @onkeydown="OnRawCommandKeyDown" />
+            <button type="button" class="btn btn-secondary" disabled="@(_busy || string.IsNullOrWhiteSpace(_rawCommand))" @onclick="SendRawCommand">Send</button>
+        </div>
+        @if (_rawResponse is not null)
+        {
+            <pre class="rcon-raw-response">@_rawResponse</pre>
+        }
     }
 }
 
 @code {
     private string? _installPath;
-    private RconConnectionInfo? _connectionInfo;
+    private RestApiConnectionInfo? _restInfo;
+    private RconConnectionInfo? _rconInfo;
     private string? _loadError;
     private string? _errorMessage;
     private string? _statusMessage;
     private bool _busy;
 
-    private IReadOnlyList<PalworldPlayer>? _players;
-    private string? _serverInfo;
+    private IReadOnlyList<PalworldRestPlayer>? _players;
+    private PalworldServerInfo? _serverInfo;
+    private PalworldMetrics? _metrics;
     private string _broadcastMessage = string.Empty;
     private string _rawCommand = string.Empty;
     private string? _rawResponse;
@@ -145,7 +175,8 @@ else
         try
         {
             var settings = await PalWorldSettingsFile.LoadAsync(_installPath);
-            _connectionInfo = RconConnectionInfo.FromSettings(settings);
+            _restInfo = RestApiConnectionInfo.FromSettings(settings);
+            _rconInfo = RconConnectionInfo.FromSettings(settings);
         }
         catch (Exception ex)
         {
@@ -153,29 +184,20 @@ else
         }
     }
 
-    private async Task<PalworldRconClient?> ConnectAsync()
+    private async Task<PalworldRestApiClient?> ConnectRestAsync()
     {
-        // Reload connection info each time in case settings changed since the page loaded.
         await LoadConnectionInfoAsync();
 
-        if (_connectionInfo is not { Enabled: true } info)
+        if (_restInfo is not { Enabled: true } info)
         {
-            _errorMessage = "RCON is not enabled.";
+            _errorMessage = "The REST API is not enabled.";
             return null;
         }
 
-        try
-        {
-            return await PalworldRconClient.ConnectAsync(info.Host, info.Port, info.Password);
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = $"Could not connect to RCON: {ex.Message}";
-            return null;
-        }
+        return new PalworldRestApiClient(info.Host, info.Port, info.Password);
     }
 
-    private async Task RunAsync(Func<PalworldRconClient, Task> action)
+    private async Task RunRestAsync(Func<PalworldRestApiClient, Task> action)
     {
         _busy = true;
         _errorMessage = null;
@@ -184,13 +206,13 @@ else
 
         try
         {
-            await using var rcon = await ConnectAsync();
-            if (rcon is null)
+            using var rest = await ConnectRestAsync();
+            if (rest is null)
             {
                 return;
             }
 
-            await action(rcon);
+            await action(rest);
         }
         catch (Exception ex)
         {
@@ -202,34 +224,64 @@ else
         }
     }
 
-    private Task RefreshPlayers() => RunAsync(async rcon => _players = await rcon.ShowPlayersAsync());
-
-    private Task RefreshInfo() => RunAsync(async rcon => _serverInfo = await rcon.GetInfoAsync());
-
-    private Task SaveWorld() => RunAsync(async rcon =>
+    private Task RefreshAll() => RunRestAsync(async rest =>
     {
-        await rcon.SaveAsync();
+        _players = await rest.GetPlayersAsync();
+        _serverInfo = await rest.GetInfoAsync();
+        _metrics = await rest.GetMetricsAsync();
+    });
+
+    private Task SaveWorld() => RunRestAsync(async rest =>
+    {
+        await rest.SaveAsync();
         _statusMessage = "World saved.";
     });
 
-    private Task SendBroadcast() => RunAsync(async rcon =>
+    private Task SendBroadcast() => RunRestAsync(async rest =>
     {
-        await rcon.BroadcastAsync(_broadcastMessage);
+        await rest.AnnounceAsync(_broadcastMessage);
         _statusMessage = "Broadcast sent.";
         _broadcastMessage = string.Empty;
     });
 
-    private Task KickPlayer(PalworldPlayer player) => RunAsync(async rcon =>
+    private Task KickPlayer(PalworldRestPlayer player) => RunRestAsync(async rest =>
     {
-        await rcon.KickPlayerAsync(player.SteamId);
+        await rest.KickAsync(player.UserId, "Kicked by server admin");
         _statusMessage = $"Kicked {player.Name}.";
-        _players = await rcon.ShowPlayersAsync();
+        _players = await rest.GetPlayersAsync();
     });
 
-    private Task SendRawCommand() => RunAsync(async rcon =>
+    private static string FormatUptime(int seconds)
     {
-        _rawResponse = await rcon.ExecuteRawAsync(_rawCommand);
-    });
+        var span = TimeSpan.FromSeconds(seconds);
+        return span.TotalHours >= 1 ? $"{(int)span.TotalHours}h {span.Minutes}m" : $"{span.Minutes}m {span.Seconds}s";
+    }
+
+    private async Task SendRawCommand()
+    {
+        if (_rconInfo is not { Enabled: true } info || string.IsNullOrWhiteSpace(_rawCommand))
+        {
+            return;
+        }
+
+        _busy = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await using var rcon = await PalworldRconClient.ConnectAsync(info.Host, info.Port, info.Password);
+            _rawResponse = await rcon.ExecuteRawAsync(_rawCommand);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Command failed: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private async Task OnRawCommandKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
     {
